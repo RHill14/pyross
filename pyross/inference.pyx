@@ -529,14 +529,14 @@ cdef class SIR_type:
                                                          Nf, model, 
                                                          contactMatrix)
             return full_cov
+        cov_ = cov(params_full)
+        invcov = np.linalg.inv(cov_)
         rows,cols = np.triu_indices(dim)
         for i,j in zip(rows,cols):
             dmu_i = partial_derivative(mean, var=i, point=params_full, dx=dx)
             dmu_j = partial_derivative(mean, var=j, point=params_full, dx=dx)
             dcov_i = partial_derivative(cov, var=i, point=params_full, dx=dx)
             dcov_j = partial_derivative(cov, var=j, point=params_full, dx=dx)
-            cov_ = cov(params_full)
-            invcov = np.linalg.inv(cov_)
             t1 = dmu_i@cov_@dmu_j
             t2 = 0.5*np.trace(invcov@dcov_i@invcov@dcov_j)
             FIM[i,j] = t1 + t2
