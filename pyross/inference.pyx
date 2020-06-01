@@ -464,7 +464,7 @@ cdef class SIR_type:
             maps[j] = xx0
         return hess
     
-    def FIM(self, keys, param_values, double [:, :] x, double Tf, int Nf,
+    def FIM(self, keys, double [:] params, double [:] x0, double Tf, int Nf,
                     contactMatrix, dx=1e-3, tangent=False):
         '''
         Computes the Fisher Information Matrix (FIM) of the model.
@@ -473,10 +473,10 @@ cdef class SIR_type:
         ----------
         keys: list
             A list of parameter names that are inferred
-        param_values: numpy.array
+        params: numpy.array
             Parameter values for which the FIM will be evaluated
-        x: 2d numpy.array
-            Observed trajectory (number of data points x (age groups * model classes))
+        x0: numpy.array
+            Initial conditions.
         Tf: float
             Total time of the trajectory
         Nf: float
@@ -491,7 +491,8 @@ cdef class SIR_type:
         FIM: 2d numpy.array
             The Fisher Information Matrix
         '''
-        x0 = x[0,:]
+        param_values = np.concatenate((x0,params))
+        dim_x0 = self.dim
         dim = len(param_values)
         FIM = np.zeros((dim,dim))
         def partial_derivative(func, var=0, point=[], dx=dx):
@@ -501,28 +502,30 @@ cdef class SIR_type:
                 return func(args)
             return derivative(wraps, point[var], dx=dx)
         def mean(params):
-            parameters = self.fill_params_dict(keys,params)
+            x0_ = params[:dim_x0]
+            parameters = self.fill_params_dict(keys,params[dim_x0:])
             self.set_params(parameters)
             model = self.make_det_model(parameters)
             if tangent:
-                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0, Tf, 
-                                                                   Nf, model, 
-                                                                   contactMatrix)
+                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
+                                                                       Nf, model, 
+                                                                       contactMatrix)
             else:
-                xm, full_cov = self.obtain_full_mean_cov(x0, Tf, 
+                xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
                                                          Nf, model, 
                                                          contactMatrix)
             return np.ravel(xm)
         def cov(params):
-            parameters = self.fill_params_dict(keys,params)
+            x0_ = params[:dim_x0]
+            parameters = self.fill_params_dict(keys,params[dim_x0:])
             self.set_params(parameters)
             model = self.make_det_model(parameters)
             if tangent:
-                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0, Tf, 
-                                                                   Nf, model, 
-                                                                   contactMatrix)
+                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
+                                                                       Nf, model, 
+                                                                       contactMatrix)
             else:
-                xm, full_cov = self.obtain_full_mean_cov(x0, Tf, 
+                xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
                                                          Nf, model, 
                                                          contactMatrix)
             return full_cov
@@ -539,8 +542,11 @@ cdef class SIR_type:
             FIM[i,j] = t1 + t2
         i_lower = np.tril_indices(dim,-1)
         FIM[i_lower] = FIM.T[i_lower]
+        ## The following changes eigenvalues vastly...
+        #if not pyross.utils.is_positive_definite(FIM): 
+        #    FIM = pyross.utils.nearest_positive_definite(FIM)
         return FIM
-    
+
     def error_bars(self, keys, maps, prior_mean, prior_stds,
                         x, Tf, Nf, contactMatrix, eps=1.e-3):
         hessian = self.compute_hessian(keys, maps, prior_mean, prior_stds,
