@@ -464,7 +464,7 @@ cdef class SIR_type:
             maps[j] = xx0
         return hess
     
-    def FIM_tangent(self, keys, param_values, double [:, :] x, double Tf, int Nf,
+    def FIM(self, keys, param_values, double [:, :] x, double Tf, int Nf,
                     contactMatrix, dx=1e-3, tangent=False):
         '''
         Computes the Fisher Information Matrix (FIM) of the model.
