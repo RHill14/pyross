@@ -491,9 +491,9 @@ cdef class SIR_type:
         FIM: 2d numpy.array
             The Fisher Information Matrix
         '''
-        param_values = np.concatenate((x0,params))
+        params_full = np.concatenate((x0,params))
         dim_x0 = self.dim
-        dim = len(param_values)
+        dim = len(params_full)
         FIM = np.zeros((dim,dim))
         def partial_derivative(func, var=0, point=[], dx=dx):
             args = point[:]
@@ -501,9 +501,9 @@ cdef class SIR_type:
                 args[var] = x
                 return func(args)
             return derivative(wraps, point[var], dx=dx)
-        def mean(params):
-            x0_ = params[:dim_x0]
-            parameters = self.fill_params_dict(keys,params[dim_x0:])
+        def mean(params_full):
+            x0_ = params_full[:dim_x0]
+            parameters = self.fill_params_dict(keys,params_full[dim_x0:])
             self.set_params(parameters)
             model = self.make_det_model(parameters)
             if tangent:
@@ -515,9 +515,9 @@ cdef class SIR_type:
                                                          Nf, model, 
                                                          contactMatrix)
             return np.ravel(xm)
-        def cov(params):
-            x0_ = params[:dim_x0]
-            parameters = self.fill_params_dict(keys,params[dim_x0:])
+        def cov(params_full):
+            x0_ = params_full[:dim_x0]
+            parameters = self.fill_params_dict(keys,params_full[dim_x0:])
             self.set_params(parameters)
             model = self.make_det_model(parameters)
             if tangent:
@@ -531,11 +531,11 @@ cdef class SIR_type:
             return full_cov
         rows,cols = np.triu_indices(dim)
         for i,j in zip(rows,cols):
-            dmu_i = partial_derivative(mean, var=i, point=param_values, dx=dx)
-            dmu_j = partial_derivative(mean, var=j, point=param_values, dx=dx)
-            dcov_i = partial_derivative(cov, var=i, point=param_values, dx=dx)
-            dcov_j = partial_derivative(cov, var=j, point=param_values, dx=dx)
-            cov_ = cov(param_values)
+            dmu_i = partial_derivative(mean, var=i, point=params_full, dx=dx)
+            dmu_j = partial_derivative(mean, var=j, point=params_full, dx=dx)
+            dcov_i = partial_derivative(cov, var=i, point=params_full, dx=dx)
+            dcov_j = partial_derivative(cov, var=j, point=params_full, dx=dx)
+            cov_ = cov(params_full)
             invcov = np.linalg.inv(cov_)
             t1 = dmu_i@cov_@dmu_j
             t2 = 0.5*np.trace(invcov@dcov_i@invcov@dcov_j)
