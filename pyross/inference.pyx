@@ -484,7 +484,9 @@ cdef class SIR_type:
         contactMatrix: callable
             A function that takes time (t) as an argument and returns the contactMatrix
         dx: float, optional
-            Step size for numerical differentiation of the process mean and its full covariance matrix with respect to the parameters. If not specified, the square root of the machine epsilon for the smallest entry on the diagonal of the covariance matrix is chosen. Decreasing the step size too small can result in round-off error.
+            Step size for numerical differentiation of the process mean and its full covariance matrix with respect 
+            to the parameters. If not specified, the square root of the machine epsilon for the smallest entry on the 
+            diagonal of the covariance matrix is chosen. Decreasing the step size too small can result in round-off error.
         tangent: bool, optional
             Set to True to use tangent space inference. Default is false.
 
