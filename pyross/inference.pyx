@@ -465,7 +465,7 @@ cdef class SIR_type:
         return hess
     
     def FIM(self, keys, double [:] params, double [:] x0, double Tf, int Nf,
-                    contactMatrix, dx=1e-3, tangent=False):
+                    contactMatrix, dx=None, tangent=False):
         '''
         Computes the Fisher Information Matrix (FIM) of the model.
 
@@ -484,7 +484,9 @@ cdef class SIR_type:
         contactMatrix: callable
             A function that takes time (t) as an argument and returns the contactMatrix
         dx: float, optional
-            Step size for numerical differentiation of the process mean and its full covariance matrix with respect to the parameters, default is 1e-3. Decreasing the step size too small can result in round-off error.
+            Step size for numerical differentiation of the process mean and its full covariance matrix with respect to the parameters. If not specified, the square root of the machine epsilon for the smallest entry on the diagonal of the covariance matrix is chosen. Decreasing the step size too small can result in round-off error.
+        tangent: bool, optional
+            Set to True to use tangent space inference. Default is false.
 
         Returns
         -------
@@ -530,6 +532,8 @@ cdef class SIR_type:
                                                          contactMatrix)
             return full_cov
         cov_ = cov(params_full)
+        if dx == None:
+            dx = np.sqrt(np.spacing(np.amin(np.abs(np.diagonal(cov_)))))
         invcov = np.linalg.inv(cov_)
         rows,cols = np.triu_indices(dim)
         for i,j in zip(rows,cols):
@@ -542,9 +546,6 @@ cdef class SIR_type:
             FIM[i,j] = t1 + t2
         i_lower = np.tril_indices(dim,-1)
         FIM[i_lower] = FIM.T[i_lower]
-        ## The following changes eigenvalues vastly...
-        #if not pyross.utils.is_positive_definite(FIM): 
-        #    FIM = pyross.utils.nearest_positive_definite(FIM)
         return FIM
 
     def error_bars(self, keys, maps, prior_mean, prior_stds,
