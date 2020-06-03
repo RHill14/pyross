@@ -468,7 +468,6 @@ cdef class SIR_type:
                     contactMatrix, dx=None, tangent=False):
         '''
         Computes the Fisher Information Matrix (FIM) of the model.
-
         Parameters
         ----------
         keys: list
@@ -489,21 +488,19 @@ cdef class SIR_type:
             diagonal of the covariance matrix is chosen. Decreasing the step size too small can result in round-off error.
         tangent: bool, optional
             Set to True to use tangent space inference. Default is false.
-
         Returns
         -------
         FIM: 2d numpy.array
             The Fisher Information Matrix
         '''
         cdef:
-            Py_ssize_t dim_x0,dim,i,j,
+            Py_ssize_t dim_x0 = self.dim, i, j
             double  t1,t2
-            np.ndarray params_full,FIM,cov_,invcov,dmu_i,dmu_j,dcov_i,dcov_j
-        params_full = np.concatenate((x0,params))
-        dim_x0 = self.dim
-        dim = len(params_full)
-        FIM = np.zeros((dim,dim))
-        def partial_derivative(func, var=0, point=[], dx=dx):
+            np.ndarray params_full = np.concatenate((x0,params))
+            np.ndarray cov_, invcov, dmu_i, dmu_j, dcov_i, dcov_j
+            Py_ssize_t dim = len(params_full)
+            np.ndarray FIM = np.zeros((dim,dim))
+        def partial_derivative(func, var, point, dx):
             args = point[:]
             def wraps(x):
                 args[var] = x
