@@ -495,6 +495,10 @@ cdef class SIR_type:
         FIM: 2d numpy.array
             The Fisher Information Matrix
         '''
+        cdef:
+            Py_ssize_t dim_x0,dim,i,j,
+            double  t1,t2
+            np.ndarray params_full,FIM,cov_,invcov,dmu_i,dmu_j,dcov_i,dcov_j
         params_full = np.concatenate((x0,params))
         dim_x0 = self.dim
         dim = len(params_full)
