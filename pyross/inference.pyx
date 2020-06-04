@@ -464,7 +464,7 @@ cdef class SIR_type:
             maps[j] = xx0
         return hess
     
-    def FIM(self, keys, double [:] params, double [:] x0, double Tf, int Nf,
+    cpdef FIM(self, keys, double [:] params, double [:] x0, double Tf, int Nf,
                     contactMatrix, dx=None, tangent=False):
         '''
         Computes the Fisher Information Matrix (FIM) of the model.
@@ -500,57 +500,64 @@ cdef class SIR_type:
             np.ndarray cov_, invcov, dmu_i, dmu_j, dcov_i, dcov_j
             Py_ssize_t dim = len(params_full)
             np.ndarray FIM = np.zeros((dim,dim))
-        def partial_derivative(func, var, point, dx):
-            args = point[:]
-            def wraps(x):
-                args[var] = x
-                return func(args)
-            return derivative(wraps, point[var], dx=dx)
-        def mean(params_full):
-            x0_ = params_full[:dim_x0]
-            parameters = self.fill_params_dict(keys,params_full[dim_x0:])
-            self.set_params(parameters)
-            model = self.make_det_model(parameters)
-            if tangent:
-                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
-                                                                       Nf, model, 
-                                                                       contactMatrix)
-            else:
-                xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
-                                                         Nf, model, 
-                                                         contactMatrix)
-            return np.ravel(xm)
-        def cov(params_full):
-            x0_ = params_full[:dim_x0]
-            parameters = self.fill_params_dict(keys,params_full[dim_x0:])
-            self.set_params(parameters)
-            model = self.make_det_model(parameters)
-            if tangent:
-                xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
-                                                                       Nf, model, 
-                                                                       contactMatrix)
-            else:
-                xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
-                                                         Nf, model, 
-                                                         contactMatrix)
-            return full_cov
-        cov_ = cov(params_full)
+        cov_ = self._cov(params_full, keys, dim_x0, tangent, Tf, Nf, contactMatrix)
         if dx == None:
             dx = np.sqrt(np.spacing(np.amin(np.abs(np.diagonal(cov_)))))
         invcov = np.linalg.inv(cov_)
         rows,cols = np.triu_indices(dim)
         for i,j in zip(rows,cols):
-            dmu_i = partial_derivative(mean, var=i, point=params_full, dx=dx)
-            dmu_j = partial_derivative(mean, var=j, point=params_full, dx=dx)
-            dcov_i = partial_derivative(cov, var=i, point=params_full, dx=dx)
-            dcov_j = partial_derivative(cov, var=j, point=params_full, dx=dx)
+            dmu_i = self._partial_derivative(self._mean, i, params_full, dx,
+                                           keys, dim_x0, tangent, Tf, Nf, contactMatrix)
+            dmu_j = self._partial_derivative(self._mean, j, params_full, dx,
+                                           keys, dim_x0, tangent, Tf, Nf, contactMatrix)
+            dcov_i = self._partial_derivative(self._cov, i, params_full, dx,
+                                           keys, dim_x0, tangent, Tf, Nf, contactMatrix)
+            dcov_j = self._partial_derivative(self._cov, j, params_full, dx,
+                                           keys, dim_x0, tangent, Tf, Nf, contactMatrix)
             t1 = dmu_i@cov_@dmu_j
-            t2 = 0.5*np.trace(invcov@dcov_i@invcov@dcov_j)
+            t2 = np.multiply(0.5,np.trace(invcov@dcov_i@invcov@dcov_j))
             FIM[i,j] = t1 + t2
         i_lower = np.tril_indices(dim,-1)
         FIM[i_lower] = FIM.T[i_lower]
         return FIM
-
+    
+    def _partial_derivative(self, func, int var, point, double dx, *func_args):
+        args = point[:]
+        def wraps(x, *wrap_args):
+            args[var] = x
+            return func(args, *wrap_args)
+        return derivative(wraps, point[var], dx=dx, args=(func_args))
+ 
+    cpdef _mean(self, double [:] params_full, keys, int dim_x0, tangent, double Tf, int Nf, contactMatrix):
+        x0_ = params_full[:dim_x0]
+        parameters = self.fill_params_dict(keys,params_full[dim_x0:])
+        self.set_params(parameters)
+        model = self.make_det_model(parameters)
+        if tangent:
+            xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
+                                                                       Nf, model, 
+                                                                       contactMatrix)
+        else:
+            xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
+                                                         Nf, model, 
+                                                         contactMatrix)
+        return np.ravel(xm)
+              
+    cpdef _cov(self, double [:] params_full, keys, int dim_x0, tangent, double Tf, int Nf, contactMatrix):
+        x0_ = params_full[:dim_x0]
+        parameters = self.fill_params_dict(keys,params_full[dim_x0:])
+        self.set_params(parameters)
+        model = self.make_det_model(parameters)
+        if tangent:
+            xm, full_cov = self.obtain_full_mean_cov_tangent_space(x0_, Tf, 
+                                                                       Nf, model, 
+                                                                       contactMatrix)
+        else:
+            xm, full_cov = self.obtain_full_mean_cov(x0_, Tf, 
+                                                         Nf, model, 
+                                                         contactMatrix)
+        return full_cov
+    
     def error_bars(self, keys, maps, prior_mean, prior_stds,
                         x, Tf, Nf, contactMatrix, eps=1.e-3):
         hessian = self.compute_hessian(keys, maps, prior_mean, prior_stds,
